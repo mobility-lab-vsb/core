@@ -1676,6 +1676,9 @@ mvg==1.6.0
 # homeassistant.components.myuplink
 myuplink==0.7.0
 
+# homeassistant.components.skoda
+myvsb-developer-api==1.0.6
+
 # homeassistant.components.nad
 nad-receiver==0.4.0
 
