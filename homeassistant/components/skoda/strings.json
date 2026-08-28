@@ -127,6 +127,9 @@
             },
             "licence_plate": {
                 "name": "Registation plate"
+            },
+            "charging_state":{
+                "name": "Charging state"
             }
         }
       }

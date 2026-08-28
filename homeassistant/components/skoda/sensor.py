@@ -56,6 +56,7 @@ async def async_setup_entry(
     selector.add_entity(RemainingACTime, coordinator)
     selector.add_entity(SupposeTimeOfReachingChargeLimit, coordinator)
     selector.add_entity(ChargingPowerInKw, coordinator)
+    selector.add_entity(ChargingStateSensor, coordinator)
     selector.add_entity(RemainingTimeToFullCharge, coordinator)
     selector.add_entity(SetTargetOfCharge, coordinator)
     selector.add_entity(ChargeTypeSensor, coordinator)
@@ -403,6 +404,42 @@ class ChargingPowerInKw(SkodaSensor):
             return None
 
         return charging.status.charge_power_in_kw
+    
+    @staticmethod
+    def capabilities() -> list[Capability]:
+        return [Capability.CHARGING]
+
+class ChargingStateSensor(SkodaSensor):
+    """Sensor for charging power in Kw """
+    entity_description = SensorEntityDescription(
+        key="charging_state",
+        translation_key="charging_state", 
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:battery-charging"
+    ) 
+
+    @property
+    def native_value(self) -> str | None:
+        charging = self.open_api_charging
+        if not charging or not charging.status:
+            return None
+        
+        state = charging.status.state
+        if state is not None:
+            if state == ChargingState.CHARGING:
+                return "CHARGING"
+            if state == ChargingState.CONNECT_CABLE:
+                return "CONNECT CABLE"
+            if state == ChargingState.READY_FOR_CHARGING:
+                return "READY FOR CHARGING"
+            if state == ChargingState.CONSERVING:
+                return "CONSERVING"
+            if state == ChargingState.DISCHARGING:
+                return "DISCHARGING"
+            if state == ChargingState.CHARGING_INTERRUPTED:
+                return "CHARGING INTERRUPTED"
+        
+        return None
     
     @staticmethod
     def capabilities() -> list[Capability]:
