@@ -1,21 +1,134 @@
 {
-  "config": {
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    "title": "Škoda Connect",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Škoda Connect",
+                "description": "***Škoda Auto a.s.*** *in collaboration with* ***Mobility Lab VŠB TUO***.\n\nTo connect the vehicle, enter the **VIN** and **API key**. *SPIN is required for auxiliary heating operations*.\n\nObtain your API key via the MyŠkoda application in section Profile -> Smart Home. \nScan the QR code or click the link:\n{portal_url}\n\n{qr_code}",
+                "data": {    
+                    "vin": "Vehicle VIN (17 characters)",
+                    "api_key": "API-Key",
+                    "spin": "S-PIN (optional)"
+                }
+            }
+        },
+        "error": {
+            "invalid_auth": "Invalid or expired API Key.",
+            "access_forbidden": "Access to this vehicle is forbidden.",
+            "vehicle_not_found": "No vehicle found with this VIN.",
+            "rate_limit_exceeded": "Rate limit exceeded or low 12V battery.",
+            "timeout_connect": "Connection to the vehicle timed out.",
+            "cannot_connect": "Cannot connect to Škoda servers.",
+            "unknown": "Unexpected error occurred.",
+            "invalid_vin_length": "VIN must be exactly 17 characters long.",
+            "api_error": "Communication error with Škoda API. Check validity of VIN and API-KEY",
+            "invalid_spin_length": "SPIN has to be 4 characters long"
+        },
+        "abort": {
+            "already_configured": "This vehicle is already configured."
+        }
     },
-    "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+    "dashboard": {
+        "categories": {
+            "info": "Vehicle Info",
+            "api": "API & System",
+            "controls": "Controls",
+            "sensors": "Sensors & Status",
+            "auxiliary_heating": "Auxiliary Heating",
+            "air_conditioning": "Air Conditioning",
+            "charging": "Charging",
+            "charging_profiles": "Charging Profiles",
+            "diagnostics": "Diagnostics",
+            "trips": "Trips"
+        }
     },
-    "step": {
-      "user": {
-        "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "username": "[%key:common::config_flow::data::username%]"
+    "entity": {
+        "sensor": {
+            "vin": {
+                "name": "VIN"
+            },
+            "car_model": {
+                "name": "Vehicle model"
+            },
+            "mileage": {
+                "name": "Mileage"
+            },
+            "timestamp_last_sync": {
+                "name": "Last synchronization"
+            },
+            "fuel_level": {
+                "name": "Fuel level"
+            },
+            "gas_level": {
+                "name": "Gas level (CNG/LPG)"
+            },
+            "battery_percentage": {
+                "name": "Battery state of charge"
+            },
+            "adblue_range": {
+                "name": "AdBlue range"
+            },
+            "total_range": {
+                "name": "Total range"
+            },
+            "electric_range": {
+                "name": "Electric range"
+            },
+            "time_of_reaching_charge_limit": {
+                "name": "Target charge reached at"
+            },
+            "remaining_ac_time": {
+                "name": "Air conditioning remaining time"
+            },
+            "charging_power": {
+                "name": "Charging power"
+            },
+            "remaining_time_to_full_battery": {
+                "name": "Time to full charge"
+            },
+            "set_target_battery_charge": {
+                "name": "Target charge limit"
+            },
+            "charge_type": {
+                "name": "Charge type"
+            },
+            "auxiliary_heating_mode": {
+                "name": "Auxiliary heating mode"
+            },
+            "aux_heating_duration": {
+                "name": "Auxiliary heating remaining duration"
+            },
+            "preset_temperature_value": {
+                "name": "Target cabin temperature"
+            },
+            "charging_profile_name_one": {
+                "name": "Charging profile 1 name"
+            },
+            "charging_profile_settings_ovrl_one": {
+                "name": "Charging profile 1 settings"
+            },
+            "charging_profile_1_preffered_time_1": {
+                "name": "Charging profile 1 preferred time"
+            },
+            "charging_profile_1_timer_1": {
+                "name": "Charging profile 1 timer"
+            },
+            "api_key_expiration": {
+                "name": "API key expiration"
+            },
+            "rate_limit_remaining": {
+                "name": "API requests remaining"
+            },
+            "rate_limit_reset_seconds": {
+                "name": "API rate limit reset"
+            },
+            "next_update_interval": {
+                "name": "Next update"
+            },
+            "licence_plate": {
+                "name": "Registation plate"
+            }
         }
       }
-    }
-  }
 }
+  
