@@ -1,9 +1,8 @@
 """DataUpdateCoordinator for the Škoda integration."""
 
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 import logging
+from typing import override
 
 from myskoda_openapi.api_layer.exceptions import (
     OpenApiAuthenticationError,
@@ -29,7 +28,14 @@ class MySkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
 
     config_entry: MySkodaConfigEntry
 
-    def __init__(self,hass: HomeAssistant, entry: MySkodaConfigEntry, client: OpenAPIClient, vin: str, spin: str | None = None,) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: MySkodaConfigEntry,
+        client: OpenAPIClient,
+        vin: str,
+        spin: str | None = None,
+    ) -> None:
         """Initialize the Škoda coordinator."""
         self.openapi = client
         self.vin = vin
@@ -45,6 +51,7 @@ class MySkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
             update_interval=UPDATE_INTERVAL,
         )
 
+    @override
     async def _async_update_data(self) -> SkodaState:
         """Fetch the latest vehicle state and rate limit data from API."""
         try:
