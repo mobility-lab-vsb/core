@@ -55,7 +55,7 @@ class MySkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
     async def _async_update_data(self) -> SkodaState:
         """Fetch the latest vehicle state and rate limit data from API."""
         try:
-            vehicle_openapi_resp = await self.openapi.get_vehicle_status(self.vin)
+            vehicle_openapi_resp = await self.openapi.get_vehicle(self.vin)
             self.last_update_time = dt_util.utcnow()
 
             return SkodaState(
