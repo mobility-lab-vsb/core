@@ -1,18 +1,10 @@
-from typing import Any, TypeVar
+"""Entity base for the Škoda integration."""
+
 from collections.abc import Callable, Coroutine
 from functools import wraps
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .coordinator import MySkodaUpdateCoordinator
-from myskoda_openapi.models.vehicle import VehicleObject, Odometer
-from myskoda_openapi.models.vehicle_status import VehicleStatus
-from myskoda_openapi.models.air_conditioning import AirConditioning
-from myskoda_openapi.models.parking_position import ParkingPosition
-from myskoda_openapi.models.driving_range import FuelStatus
-from myskoda_openapi.models.charging import Charging
-from myskoda_openapi.models.auxiliary_heating import AuxiliaryHeating
-from myskoda_openapi.models.charging_profiles import ChargingProfiles
-from myskoda_openapi.models.active_ventilation import ActiveVentilation
+import logging
+from typing import Any, TypeVar, override
+
 from myskoda_openapi.api_layer.exceptions import (
     OpenApiAuthenticationError,
     OpenApiError,
@@ -22,9 +14,21 @@ from myskoda_openapi.api_layer.exceptions import (
     OpenApiUnsupportedError,
     OpenApiVehicleNotFoundError,
 )
+from myskoda_openapi.models.active_ventilation import ActiveVentilation
+from myskoda_openapi.models.air_conditioning import AirConditioning
+from myskoda_openapi.models.auxiliary_heating import AuxiliaryHeating
+from myskoda_openapi.models.charging import Charging
+from myskoda_openapi.models.charging_profiles import ChargingProfiles
+from myskoda_openapi.models.driving_range import FuelStatus
+from myskoda_openapi.models.parking_position import ParkingPosition
+from myskoda_openapi.models.vehicle import Odometer, VehicleObject
+from myskoda_openapi.models.vehicle_status import VehicleStatus
+
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-import logging 
+from .coordinator import MySkodaUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,12 +46,15 @@ EXCEPTION_ALERT_MAP: dict[type[Exception], str] = {
     OpenApiError: "alert_bad_request",
 }
 
+
 def skoda_exception_handler(
     action_description: str = "Operation",
 ) -> Callable[..., Callable[..., Coroutine[Any, Any, Any]]]:
-    """Decorator for catching exceptions and sending Alerts"""
+    """Decorator for catching exceptions and sending Alerts."""
 
-    def decorator(func: Callable[..., Coroutine[Any, Any, Any]],) -> Callable[..., Coroutine[Any, Any, Any]]:
+    def decorator(
+        func: Callable[..., Coroutine[Any, Any, Any]],
+    ) -> Callable[..., Coroutine[Any, Any, Any]]:
         @wraps(func)
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
             try:
@@ -58,27 +65,34 @@ def skoda_exception_handler(
                     self._expected_mode = None
                     self.async_write_ha_state()
 
-                # Send localized alers
+                # Send localized alerts
                 alert_key = EXCEPTION_ALERT_MAP.get(type(err), "alert_server_error")
                 if hasattr(self, "alerts") and self.alerts:
                     await self.alerts.failure(alert_key)
 
-                entity_name = getattr(self, "entity_id", None) or self.__class__.__name__
-                _LOGGER.error("[%s] %s failed: %s", entity_name, action_description, err, exc_info=True,)
+                entity_name = (
+                    getattr(self, "entity_id", None) or self.__class__.__name__
+                )
+                _LOGGER.exception(
+                    "[%s] %s failed",
+                    entity_name,
+                    action_description,
+                )
 
         return wrapper
 
     return decorator
 
-"""Base class for all Škoda entities, providing shared logic and device registration"""
-class SkodaEntity(CoordinatorEntity):
-    """Class for all the entities in the integration"""    
+
+class SkodaEntity(CoordinatorEntity[MySkodaUpdateCoordinator]):
+    """Class for all the entities in the integration."""
+
     _attr_has_entity_name = True
 
-    """Initialize the entity, link it to the coordinator, and set a unique ID based on VIN and key"""
-    def __init__(self, coordinator: MySkodaUpdateCoordinator, vin: str):
+    def __init__(self, coordinator: MySkodaUpdateCoordinator, vin: str) -> None:
+        """Initialize the entity with a unique ID based on VIN and entity key."""
         super().__init__(coordinator)
-        self.vin = vin #coordinator.vin
+        self.vin = vin  # coordinator.vin
 
         if not self.entity_description:
             raise ValueError("Missing entity_description on class!")
@@ -88,12 +102,6 @@ class SkodaEntity(CoordinatorEntity):
 
         self._attr_unique_id = f"{vin}_{self.entity_description.key}"
 
-    
-    """Handle additional logic when the entity is successfully added to Home Assistant"""
-    async def async_added_to_hass(self):
-        await super().async_added_to_hass()
-
-    """New OpenAPI methods"""
     @property
     def api_key_expires_at(self) -> str | None:
         """Return the API key expiration timestamp."""
@@ -128,49 +136,49 @@ class SkodaEntity(CoordinatorEntity):
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.odometer
         return None
-    
+
     @property
     def open_api_charging_profiles(self) -> ChargingProfiles | None:
         """Returns main Odometer from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.charging_profiles
         return None
-    
+
     @property
     def open_api_air_conditioning(self) -> AirConditioning | None:
         """Returns main AirConditioning from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.air_conditioning
         return None
-    
+
     @property
     def open_api_vehicle_status(self) -> VehicleStatus | None:
         """Returns main VehicleStatus from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.status
         return None
-    
+
     @property
     def open_api_parking_position(self) -> ParkingPosition | None:
         """Returns main ParkingPosition from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.parking_position
         return None
-    
+
     @property
     def open_api_driving_range(self) -> FuelStatus | None:
         """Returns main FuelStatus from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.fuel_status
         return None
-    
+
     @property
     def open_api_charging(self) -> Charging | None:
         """Returns main Charging from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.charging
         return None
-    
+
     @property
     def open_api_auxiliary_heating(self) -> AuxiliaryHeating | None:
         """Returns main AuxiliaryHeating from new OpenAPI."""
@@ -196,7 +204,6 @@ class SkodaEntity(CoordinatorEntity):
         # Utilizes the open_api_driving_range property, which returns FuelStatus
         return self.open_api_driving_range is not None
 
-    """Old Myskoda API methods"""
     @property
     def spin(self) -> str | None:
         """Return the stored S-PIN if available."""
@@ -208,11 +215,19 @@ class SkodaEntity(CoordinatorEntity):
         return bool(self.spin)
 
     @property
+    @override
     def device_info(self) -> DeviceInfo:
-        """Define the device information to group all entities under a single vehicle in the UI"""
+        """Define the device information to group all entities under a single vehicle in the UI."""
         vehicle_name = "Škoda Vehicle"
-        if self.coordinator.data and self.coordinator.data.vehicle_response and self.coordinator.data.vehicle_response.vehicle:
-            vehicle_name = self.coordinator.data.vehicle_response.vehicle.name or f"Škoda {self.vin}"
+        if (
+            self.coordinator.data
+            and self.coordinator.data.vehicle_response
+            and self.coordinator.data.vehicle_response.vehicle
+        ):
+            vehicle_name = (
+                self.coordinator.data.vehicle_response.vehicle.name
+                or f"Škoda {self.vin}"
+            )
         return {
             "identifiers": {(DOMAIN, self.vin)},
             "name": vehicle_name,

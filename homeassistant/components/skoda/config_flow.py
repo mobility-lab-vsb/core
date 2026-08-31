@@ -1,28 +1,31 @@
 """Config flow for the Škoda integration."""
 
-from __future__ import annotations
-
 import logging
-from typing import Any
-
-import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from typing import Any, override
 
 # Import vlastních výjimek a klienta z nové OpenAPI knihovny
 from myskoda_openapi.api_layer.exceptions import (
     OpenApiAuthenticationError,
+    OpenApiError,
     OpenApiForbiddenError,
     OpenApiRateLimitError,
     OpenApiServerError,
     OpenApiVehicleNotFoundError,
-    OpenApiError,
 )
 from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
+import voluptuous as vol
 
-from .const import CONF_API_KEY, CONF_SPIN, CONF_VIN, DOMAIN, MYSKODA_URL, QR_URL
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import CONF_API_KEY
+from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .const import CONF_SPIN, CONF_VIN, DOMAIN, MYSKODA_URL, QR_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ STEP_VEHICLE_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_SPIN, default=""): str,
     }
 )
+
 
 class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for MyŠkoda."""
@@ -47,6 +51,7 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
         # calling an endpoint /api/v1/vehicle/{vin}
         return await client.get_vehicle(vin)
 
+    @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -119,9 +124,11 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
+    @override
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Return options flow handler for runtime configuration."""
         return MySkodaOptionsFlowHandler()
+
 
 class MySkodaOptionsFlowHandler(OptionsFlow):
     """Handle MyŠkoda options (e.g. changing SPIN)."""

@@ -6634,6 +6634,11 @@
       "config_flow": false,
       "iot_class": "local_push"
     },
+    "skoda": {
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "cloud_polling"
+    },
     "sky": {
       "name": "Sky",
       "integrations": {
@@ -8739,6 +8744,7 @@
     "schedule",
     "season",
     "shopping_list",
+    "skoda",
     "statistics",
     "sun",
     "switch_as_x",

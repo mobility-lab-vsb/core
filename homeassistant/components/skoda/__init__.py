@@ -1,15 +1,12 @@
 """The Škoda integration."""
 
-from __future__ import annotations
-
 from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .capability_selector import CapabilitySelector
-from .const import CONF_API_KEY, CONF_SPIN, CONF_VIN
+from .const import CONF_SPIN, CONF_VIN
 from .coordinator import MySkodaUpdateCoordinator
 from .models import MySkodaConfigEntry, MySkodaData
 
@@ -17,7 +14,7 @@ from .models import MySkodaConfigEntry, MySkodaData
 # For your initial PR, limit it to 1 platform (e.g. Platform.SENSOR).
 _PLATFORMS: list[Platform] = [Platform.SENSOR]
 
-# TODO Update entry annotation
+
 async def async_setup_entry(hass: HomeAssistant, entry: MySkodaConfigEntry) -> bool:
     """Set up Škoda from a config entry."""
 
@@ -51,18 +48,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: MySkodaConfigEntry) -> b
         vin=vin,
     )
 
-    # Control the capabilities of the vehicle based on the data retrieved from the API.
-    vehicle = getattr(coordinator.data, "vehicle", None)
-    if vehicle:
-        selector = CapabilitySelector(hass, vehicle)
-        await selector.check_capabilities(hass)
-
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
     return True
 
 
-# Update entry annotation
 async def async_unload_entry(hass: HomeAssistant, entry: MySkodaConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, _PLATFORMS)

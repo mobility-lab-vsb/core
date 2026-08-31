@@ -1,14 +1,21 @@
-import logging
+"""Capability-based selection of Škoda entities."""
+
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Any, Type
+import logging
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+from .coordinator import MySkodaUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class Capability(StrEnum):
+    """Capabilities a Škoda vehicle may support."""
+
     STATUS = "status"
     ODOMETER = "odometer"
     POSITION = "parking_position"
@@ -27,7 +34,9 @@ class Capability(StrEnum):
     CT_LPG = "ct_lpg"
     SUNROOF = "sunroof"
 
+
 def extract_vehicle_capabilities(data: dict[str, Any]) -> set[Capability]:
+    """Extract the set of supported capabilities from a vehicle data dump."""
     caps: set[Capability] = set()
 
     # Basic objects
@@ -59,17 +68,23 @@ def extract_vehicle_capabilities(data: dict[str, Any]) -> set[Capability]:
     # Fuel
     range_info = data.get("fuel_status") or {}
     if range_info:
-        primary_engine = range_info.get("primary_engine_range") or range_info.get("primaryEngineRange")
-        secondary_engine = range_info.get("secondary_engine_range") or range_info.get("secondaryEngineRange")
+        primary_engine = range_info.get("primary_engine_range") or range_info.get(
+            "primaryEngineRange"
+        )
+        secondary_engine = range_info.get("secondary_engine_range") or range_info.get(
+            "secondaryEngineRange"
+        )
         engine_type_primary = (
             primary_engine.get("engine_type") or primary_engine.get("engineType")
             if isinstance(primary_engine, dict)
-            else getattr(primary_engine, "engine_type", None) or getattr(primary_engine, "engineType", None)
+            else getattr(primary_engine, "engine_type", None)
+            or getattr(primary_engine, "engineType", None)
         )
         engine_type_secondary = (
             secondary_engine.get("engine_type") or secondary_engine.get("engineType")
             if isinstance(secondary_engine, dict)
-            else getattr(secondary_engine, "engine_type", None) or getattr(secondary_engine, "engineType", None)
+            else getattr(secondary_engine, "engine_type", None)
+            or getattr(secondary_engine, "engineType", None)
         )
         primary_str = (engine_type_primary or "").upper()
         secondary_str = (engine_type_secondary or "").upper()
@@ -90,13 +105,14 @@ def extract_vehicle_capabilities(data: dict[str, Any]) -> set[Capability]:
         if range_info.get("ad_blue_range") is not None:
             caps.add(Capability.ADBLUE)
 
-
     return caps
+
 
 class CapabilitySelector:
     """Class to select which entities will be added to Home Assistant based on vehicle capabilities."""
 
     def __init__(self, hass: HomeAssistant, vehicle_data: Any) -> None:
+        """Extract the vehicle capabilities from the provided data."""
         self.hass = hass
 
         if hasattr(vehicle_data, "model_dump"):
@@ -107,11 +123,12 @@ class CapabilitySelector:
             raw_data = vehicle_data
         else:
             raw_data = {}
-        
-        _LOGGER.warning("[%s] Vehicle DATA: %s",vehicle_data.vin, vehicle_data)
+
+        vin = getattr(vehicle_data, "vin", None)
+        _LOGGER.debug("[%s] Vehicle DATA: %s", vin, vehicle_data)
 
         self.car_capabilities: set[Capability] = extract_vehicle_capabilities(raw_data)
-        _LOGGER.warning("[%s] CAPABILITES: %s", vehicle_data.vin, self.car_capabilities)
+        _LOGGER.debug("[%s] CAPABILITIES: %s", vin, self.car_capabilities)
         self.entities: list[Entity] = []
 
     def _evaluate_capabilities(self, req: Any) -> bool:
@@ -126,7 +143,7 @@ class CapabilitySelector:
         # Inner structure
         if isinstance(req, (list, set, tuple)):
             for item in req:
-                #Item is a group -> logic OR (one of them is enough)
+                # Item is a group -> logic OR (one of them is enough)
                 if isinstance(item, (list, set, tuple)):
                     if not any(sub_cap in self.car_capabilities for sub_cap in item):
                         return False
@@ -138,15 +155,23 @@ class CapabilitySelector:
 
         return False
 
-    def add_entity(self, entity_cls: Type[Entity], coordinator: DataUpdateCoordinator) -> None:
+    def add_entity(
+        self,
+        entity_cls: Callable[[MySkodaUpdateCoordinator], Entity],
+        coordinator: MySkodaUpdateCoordinator,
+    ) -> None:
         """Add an entity if the vehicle matches required capability logic."""
         raw_capabilities = getattr(entity_cls, "capabilities", None)
 
         if callable(raw_capabilities):
             try:
                 required_caps = raw_capabilities()
-            except Exception as e:
-                _LOGGER.error("Chyba při vyhodnocování capabilities pro %s: %s", entity_cls.__name__, e)
+            except (TypeError, ValueError) as err:
+                _LOGGER.error(
+                    "Error evaluating capabilities for %s: %s",
+                    entity_cls.__name__,
+                    err,
+                )
                 required_caps = None
         else:
             required_caps = raw_capabilities
@@ -162,10 +187,5 @@ class CapabilitySelector:
             )
 
     def get_entities(self) -> list[Entity]:
+        """Return the list of entities selected for the vehicle."""
         return self.entities
-
-
-
-
-
-
