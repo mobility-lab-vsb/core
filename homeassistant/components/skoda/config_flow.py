@@ -45,9 +45,7 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
         # calling an endpoint /api/v1/vehicle/{vin}
         return await client.get_vehicle(vin)
 
-    async def _async_validate(
-        self, vin: str, api_key: str
-    ) -> tuple[Any, str | None]:
+    async def _async_validate(self, vin: str, api_key: str) -> tuple[Any, str | None]:
         """Validate credentials, returning (response, None) or (None, error_code)."""
         try:
             return await self._test_credentials(vin, api_key), None
