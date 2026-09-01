@@ -1,10 +1,11 @@
 """Support for Škoda sensors."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from enum import StrEnum
 import logging
 from typing import Any, override
 
-from myskoda_openapi.models.charging_profiles import ChargingProfile
 from myskoda_openapi.models.enums import AirConditioningState, ChargeType, ChargingState
 
 from homeassistant.components.sensor import (
@@ -22,15 +23,195 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .capability_selector import Capability, CapabilitySelector
 from .coordinator import MySkodaUpdateCoordinator
 from .entity import SkodaEntity
 from .models import MySkodaConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
+
+
+class Capability(StrEnum):
+    """Capabilities a Škoda vehicle may support."""
+
+    STATUS = "status"
+    ODOMETER = "odometer"
+    POSITION = "parking_position"
+    CHARGING = "charging"
+    CHARGING_PROFILES = "charging_profiles"
+    AIR_CONDITIONING = "air_conditioning"
+    VENTILATION = "active_ventilation"
+    AUXILIARY_HEATING = "auxiliary_heating"
+    FUEL_STATUS = "fuel_status"
+    ADBLUE = "ad_blue_range"
+    CT_ELECTRIC = "ct_electric"
+    CT_HYBRID = "ct_hybrid"
+    CT_GASOLINE = "ct_gasoline"
+    CT_DIESEL = "ct_diesel"
+    CT_CNG = "ct_cng"
+    CT_LPG = "ct_lpg"
+    SUNROOF = "sunroof"
+
+
+def extract_vehicle_capabilities(data: dict[str, Any]) -> set[Capability]:
+    """Extract the set of supported capabilities from a vehicle data dump."""
+    caps: set[Capability] = set()
+
+    # Basic objects
+    status = data.get("status")
+    if status:
+        caps.add(Capability.STATUS)
+        detail = status.get("detail")
+        if detail and detail.get("sunroof"):
+            caps.add(Capability.SUNROOF)
+    if data.get("odometer"):
+        caps.add(Capability.ODOMETER)
+    if data.get("parking_position"):
+        caps.add(Capability.POSITION)
+    if data.get("charging"):
+        caps.add(Capability.CHARGING)
+    if data.get("charging_profiles"):
+        caps.add(Capability.CHARGING_PROFILES)
+    if data.get("air_conditioning"):
+        caps.add(Capability.AIR_CONDITIONING)
+    if data.get("auxiliary_heating"):
+        caps.add(Capability.AUXILIARY_HEATING)
+    if data.get("active_ventilation"):
+        caps.add(Capability.VENTILATION)
+    if data.get("fuel_status"):
+        caps.add(Capability.FUEL_STATUS)
+    if data.get("ad_blue_range"):
+        caps.add(Capability.ADBLUE)
+
+    # Fuel
+    range_info = data.get("fuel_status") or {}
+    if range_info:
+        primary_engine = range_info.get("primary_engine_range") or range_info.get(
+            "primaryEngineRange"
+        )
+        secondary_engine = range_info.get("secondary_engine_range") or range_info.get(
+            "secondaryEngineRange"
+        )
+        engine_type_primary = (
+            primary_engine.get("engine_type") or primary_engine.get("engineType")
+            if isinstance(primary_engine, dict)
+            else getattr(primary_engine, "engine_type", None)
+            or getattr(primary_engine, "engineType", None)
+        )
+        engine_type_secondary = (
+            secondary_engine.get("engine_type") or secondary_engine.get("engineType")
+            if isinstance(secondary_engine, dict)
+            else getattr(secondary_engine, "engine_type", None)
+            or getattr(secondary_engine, "engineType", None)
+        )
+        primary_str = (engine_type_primary or "").upper()
+        secondary_str = (engine_type_secondary or "").upper()
+        if "ELECTRIC" in (primary_str, secondary_str):
+            caps.add(Capability.CT_ELECTRIC)
+        if range_info.get("car_type") is not None:
+            car_type = range_info.get("car_type")
+            if car_type == "HYBRID":
+                caps.add(Capability.CT_HYBRID)
+            if car_type == "GASOLINE":
+                caps.add(Capability.CT_GASOLINE)
+            if car_type == "DIESEL":
+                caps.add(Capability.CT_DIESEL)
+            if car_type == "CNG":
+                caps.add(Capability.CT_CNG)
+            if car_type == "LPG":
+                caps.add(Capability.CT_LPG)
+        if range_info.get("ad_blue_range") is not None:
+            caps.add(Capability.ADBLUE)
+
+    return caps
+
+
+class CapabilitySelector:
+    """Class to select which entities will be added to Home Assistant based on vehicle capabilities."""
+
+    def __init__(self, hass: HomeAssistant, vehicle_data: Any) -> None:
+        """Extract the vehicle capabilities from the provided data."""
+        self.hass = hass
+
+        if hasattr(vehicle_data, "model_dump"):
+            raw_data = vehicle_data.model_dump(by_alias=False)
+        elif hasattr(vehicle_data, "dict"):
+            raw_data = vehicle_data.dict()
+        elif isinstance(vehicle_data, dict):
+            raw_data = vehicle_data
+        else:
+            raw_data = {}
+
+        vin = getattr(vehicle_data, "vin", None)
+        _LOGGER.debug("[%s] Vehicle DATA: %s", vin, vehicle_data)
+
+        self.car_capabilities: set[Capability] = extract_vehicle_capabilities(raw_data)
+        _LOGGER.debug("[%s] CAPABILITIES: %s", vin, self.car_capabilities)
+        self.entities: list[Entity] = []
+
+    def _evaluate_capabilities(self, req: Any) -> bool:
+        """Evaluate if required capabilities match vehicle capabilities (supports AND/OR)."""
+        if not req:
+            return True
+
+        # Alone capabilities
+        if isinstance(req, (Capability, str)):
+            return req in self.car_capabilities
+
+        # Inner structure
+        if isinstance(req, (list, set, tuple)):
+            for item in req:
+                # Item is a group -> logic OR (one of them is enough)
+                if isinstance(item, (list, set, tuple)):
+                    if not any(sub_cap in self.car_capabilities for sub_cap in item):
+                        return False
+                # Item is an alone capability -> logic AND (vehicle has to have all)
+                elif isinstance(item, (Capability, str)):
+                    if item not in self.car_capabilities:
+                        return False
+            return True
+
+        return False
+
+    def add_entity(
+        self,
+        entity_cls: Callable[[MySkodaUpdateCoordinator], Entity],
+        coordinator: MySkodaUpdateCoordinator,
+    ) -> None:
+        """Add an entity if the vehicle matches required capability logic."""
+        raw_capabilities = getattr(entity_cls, "capabilities", None)
+
+        if callable(raw_capabilities):
+            try:
+                required_caps = raw_capabilities()
+            except (TypeError, ValueError) as err:
+                _LOGGER.error(
+                    "Error evaluating capabilities for %s: %s",
+                    entity_cls.__name__,
+                    err,
+                )
+                required_caps = None
+        else:
+            required_caps = raw_capabilities
+
+        if self._evaluate_capabilities(required_caps):
+            self.entities.append(entity_cls(coordinator))
+        else:
+            _LOGGER.debug(
+                "Entity %s skipped. Requirements %s do not match vehicle capabilities: %s",
+                entity_cls.__name__,
+                required_caps,
+                self.car_capabilities,
+            )
+
+    def get_entities(self) -> list[Entity]:
+        """Return the list of entities selected for the vehicle."""
+        return self.entities
 
 
 async def async_setup_entry(
@@ -47,8 +228,6 @@ async def async_setup_entry(
 
     selector = CapabilitySelector(hass, vehicle_data)
 
-    selector.add_entity(ModelSensor, coordinator)
-    selector.add_entity(VINSensor, coordinator)
     selector.add_entity(MileAge, coordinator)
     selector.add_entity(LastSynchronization, coordinator)
     selector.add_entity(FuelLevel, coordinator)
@@ -83,64 +262,6 @@ class SkodaSensor(SkodaEntity, SensorEntity):
         """Initialize the sensor with a coordinator and VIN."""
         vin = coordinator.vin
         super().__init__(coordinator, vin)
-
-    @property
-    def _charge_profiles(self) -> list[ChargingProfile] | None:
-        """Returns the list of charging profiles."""
-        if (
-            self.open_api_charging_profiles is None
-            or self.open_api_charging_profiles.profiles is None
-        ):
-            return None
-
-        return self.open_api_charging_profiles.profiles
-
-    def _get_profile(self, profile_num: int) -> ChargingProfile | None:
-        profiles = self._charge_profiles
-        if profiles and 0 <= profile_num < len(profiles):
-            return profiles[profile_num]
-
-        return None
-
-
-class ModelSensor(SkodaSensor):
-    """Sensor that reports the vehicle model."""
-
-    entity_description = SensorEntityDescription(
-        key="model",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:car",
-        translation_key="car_model",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        oa_vehicle = self.open_api_vehicle
-        if oa_vehicle and oa_vehicle.name:
-            return oa_vehicle.name
-
-        return None
-
-
-class VINSensor(SkodaSensor):
-    """Sensor that reports the VIN of the vehicle."""
-
-    entity_description = SensorEntityDescription(
-        key="vin",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:car-info",
-        translation_key="vin",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        oa_vehicle = self.open_api_vehicle
-        if oa_vehicle and oa_vehicle.vin:
-            return oa_vehicle.vin
-
-        return None
 
 
 class MileAge(SkodaSensor):
@@ -294,7 +415,6 @@ class AdBlueRange(SkodaSensor):
         key="adblue_range",
         translation_key="adblue_range",
         native_unit_of_measurement=UnitOfLength.KILOMETERS,
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:car-coolant-level",
     )
 
@@ -473,7 +593,6 @@ class ChargingStateSensor(SkodaSensor):
     entity_description = SensorEntityDescription(
         key="charging_state",
         translation_key="charging_state",
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:battery-charging",
     )
 
@@ -543,7 +662,6 @@ class SetTargetOfCharge(SkodaSensor):
         key="set_target_battery_charge",
         translation_key="set_target_battery_charge",
         native_unit_of_measurement=PERCENTAGE,
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:percent-circle-outline",
     )
 
@@ -568,7 +686,6 @@ class ChargeTypeSensor(SkodaSensor):
     entity_description = SensorEntityDescription(
         key="charge_type",
         translation_key="charge_type",
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:connection",
     )
 
@@ -608,7 +725,6 @@ class AuxiliaryHeatingMode(SkodaSensor):
     entity_description = SensorEntityDescription(
         key="auxiliary_heating_mode",
         translation_key="auxiliary_heating_mode",
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:heating-coil",
     )
 
@@ -664,7 +780,6 @@ class PresetTemperatureValue(SkodaSensor):
         translation_key="preset_temperature_value",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
-        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:thermometer",
     )
 
@@ -681,188 +796,6 @@ class PresetTemperatureValue(SkodaSensor):
     def capabilities() -> list[Capability]:
         """Return the capabilities required for this entity."""
         return [Capability.AIR_CONDITIONING]
-
-
-class ChargingProfileName1(SkodaSensor):
-    """Charging profile 1 name."""
-
-    entity_description = SensorEntityDescription(
-        key="charging_profile_name_one",
-        translation_key="charging_profile_name_one",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:account-cog",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        profile = self._get_profile(0)
-        return profile.name if profile else None
-
-    @property
-    @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        profile_one = self._get_profile(0)
-        if profile_one is None:
-            return {}
-
-        attrs: dict[str, Any] = {
-            "id": profile_one.id,
-        }
-
-        # Settings of the Profile
-        settings = profile_one.settings
-        if settings is not None:
-            attrs["auto_unlock_plug_when_charged"] = (
-                settings.auto_unlock_plug_when_charged
-            )
-            attrs["max_charging_current"] = settings.max_charging_current
-            attrs["target_state_of_charge_in_percent"] = (
-                settings.target_state_of_charge_in_percent
-            )
-
-            min_soc = settings.min_battery_state_of_charge
-            if min_soc is not None:
-                attrs["min_battery_soc_enabled"] = min_soc.enabled
-                attrs["min_battery_soc_in_percent"] = (
-                    min_soc.minimum_battery_state_of_charge_in_percent
-                )
-
-        return attrs
-
-    @property
-    @override
-    def available(self) -> bool:
-        return self._get_profile(0) is not None
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING_PROFILES]
-
-
-class ChargingProfileSettingsOverall1(SkodaSensor):
-    """Charging profile 1 settings summary."""
-
-    entity_description = SensorEntityDescription(
-        key="charging_profile_settings_ovrl_one",
-        translation_key="charging_profile_settings_ovrl_one",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:information-slab-box-outline",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        profile = self._get_profile(0)
-        if not profile or not profile.settings:
-            return None
-        s = profile.settings
-        min_soc = f"{s.min_battery_state_of_charge.minimum_battery_state_of_charge_in_percent}%"
-
-        return f"Max: {s.target_state_of_charge_in_percent}% | Min: {min_soc} | Current: {s.max_charging_current} | AutoUnlock: {s.auto_unlock_plug_when_charged}"
-
-    @property
-    @override
-    def available(self) -> bool:
-        return self._get_profile(0) is not None
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING_PROFILES]
-
-
-class ChargingProfile1_PrefferedTime1(SkodaSensor):
-    """Charging profile 1 preferred charging time."""
-
-    entity_description = SensorEntityDescription(
-        key="charging_profile_1_preffered_time_1",
-        translation_key="charging_profile_1_preffered_time_1",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:calendar-clock",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        profile = self._get_profile(0)
-        if not profile or not profile.preferred_charging_times:
-            return None
-        pref_time_1 = profile.preferred_charging_times[0]
-
-        return f"{pref_time_1.start_time} - {pref_time_1.end_time}"
-
-    @property
-    @override
-    def available(self) -> bool:
-        profile = self._get_profile(0)
-        if not profile or not profile.preferred_charging_times:
-            return False
-        pref_time_1 = profile.preferred_charging_times[0]
-        return pref_time_1.enabled
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING_PROFILES]
-
-
-class ChargingProfile1_Timer1(SkodaSensor):
-    """Charging profile 1 timer."""
-
-    entity_description = SensorEntityDescription(
-        key="charging_profile_1_timer_1",
-        translation_key="charging_profile_1_timer_1",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:battery-clock-outline",
-    )
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        profile = self._get_profile(0)
-        if not profile or not profile.timers:
-            return None
-        timer_1 = profile.timers[0]
-
-        return f"{timer_1.type}"
-
-    @property
-    @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        profile = self._get_profile(0)
-        if not profile or not profile.timers:
-            return {}
-
-        timer_1 = profile.timers[0]
-        attrs: dict[str, Any] = {
-            "time": timer_1.time,
-        }
-
-        # Settings of the Timer
-        if timer_1.one_off_day is not None:
-            attrs["one_off_day"] = timer_1.one_off_day
-
-        if timer_1.recurring_on is not None:
-            attrs["recurring_on"] = list(timer_1.recurring_on)
-
-        return attrs
-
-    @property
-    @override
-    def available(self) -> bool:
-        """The sensor is available only if the vehicle supports charging profiles."""
-        profile = self._get_profile(0)
-        if not profile or not profile.timers:
-            return False
-        timer_1 = profile.timers[0]
-        return timer_1.enabled
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING_PROFILES]
 
 
 class APIKeyExpiration(SkodaSensor):

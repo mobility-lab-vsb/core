@@ -11,23 +11,24 @@ from myskoda_openapi.api_layer.exceptions import (
     OpenApiServerError,
     OpenApiVehicleNotFoundError,
 )
+from myskoda_openapi.models.vehicle import VehicleResponse
 import pytest
 
 from homeassistant import config_entries
-from homeassistant.components.skoda.const import CONF_SPIN, CONF_VIN, DOMAIN
+from homeassistant.components.skoda.const import CONF_VIN, DOMAIN
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
+from tests.common import MockConfigEntry
+
 VIN = "TMBJM7NP2M1TMP511"
 API_KEY = "test-api-key"
-SPIN = "1234"
 
 USER_INPUT = {
     CONF_VIN: VIN,
     CONF_API_KEY: API_KEY,
-    CONF_SPIN: SPIN,
 }
 
 VEHICLE_WITH_NAME = SimpleNamespace(vehicle=SimpleNamespace(name="Superb"))
@@ -81,7 +82,6 @@ async def test_success(hass: HomeAssistant, mock_setup_entry: AsyncMock) -> None
     assert result["data"] == {
         CONF_VIN: VIN,
         CONF_API_KEY: API_KEY,
-        CONF_SPIN: SPIN,
     }
     assert len(mock_setup_entry.mock_calls) == 1
 
@@ -109,17 +109,6 @@ async def test_invalid_vin_length(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_VIN: "invalid_vin_length"}
-
-
-async def test_invalid_spin_length(hass: HomeAssistant) -> None:
-    """Test the SPIN length is validated before contacting the API."""
-    result = await _init_flow(hass)
-    result = await _configure_flow(
-        hass, result["flow_id"], {**USER_INPUT, CONF_SPIN: "12"}
-    )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {CONF_SPIN: "invalid_spin_length"}
 
 
 async def test_duplicate_entry(
@@ -177,3 +166,43 @@ async def test_api_errors(
     assert mock.await_count == 1
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": expected_error}
+
+
+async def test_reauth_success(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_vehicle_response: VehicleResponse,
+) -> None:
+    """Test a successful reauth updates the stored API key and reloads the entry."""
+    mock_config_entry.add_to_hass(hass)
+    _patch_get_vehicle(return_value=mock_vehicle_response)
+
+    result = await mock_config_entry.start_reauth_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "new-api-key"}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert mock_config_entry.data[CONF_API_KEY] == "new-api-key"
+
+
+async def test_reauth_invalid_auth_shows_error(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Test an invalid API key during reauth keeps the form with an error."""
+    mock_config_entry.add_to_hass(hass)
+    _patch_get_vehicle(side_effect=OpenApiAuthenticationError())
+
+    result = await mock_config_entry.start_reauth_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "still-bad-key"}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+    assert result["errors"] == {"base": "invalid_auth"}

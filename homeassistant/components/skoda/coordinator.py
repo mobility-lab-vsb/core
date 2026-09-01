@@ -34,13 +34,10 @@ class MySkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
         entry: MySkodaConfigEntry,
         client: OpenAPIClient,
         vin: str,
-        spin: str | None = None,
     ) -> None:
         """Initialize the Škoda coordinator."""
         self.openapi = client
         self.vin = vin
-        self.spin = spin
-        self.aux_heating_duration_minutes: int = 20
         self.last_update_time: datetime | None = None
 
         super().__init__(

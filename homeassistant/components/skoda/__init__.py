@@ -6,7 +6,7 @@ from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_SPIN, CONF_VIN
+from .const import CONF_VIN
 from .coordinator import MySkodaUpdateCoordinator
 from .models import MySkodaConfigEntry, MySkodaData
 
@@ -21,7 +21,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: MySkodaConfigEntry) -> b
     # Extract the configuration data from the entry
     vin: str = entry.data[CONF_VIN]
     api_key: str = entry.data.get(CONF_API_KEY, "")
-    spin: str | None = entry.data.get(CONF_SPIN) or entry.options.get(CONF_SPIN)
 
     # 1. Create API instance
     # Initialization of the API client with the provided API key and an aiohttp session.
@@ -34,7 +33,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: MySkodaConfigEntry) -> b
         entry=entry,
         client=openapi_client,
         vin=vin,
-        spin=spin,
     )
 
     # 2. Validate the API connection (and authentication)

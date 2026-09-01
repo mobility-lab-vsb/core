@@ -1,5 +1,6 @@
 """Config flow for the Škoda integration."""
 
+from collections.abc import Mapping
 import logging
 from typing import Any, override
 
@@ -15,26 +16,19 @@ from myskoda_openapi.api_layer.exceptions import (
 from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_API_KEY
-from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_SPIN, CONF_VIN, DOMAIN, MYSKODA_URL, QR_URL
+from .const import CONF_VIN, DOMAIN, MYSKODA_URL
 
 _LOGGER = logging.getLogger(__name__)
 
-# Form for initial user input, including VIN, API key, and optional SPIN.
+# Form for initial user input: VIN and API key.
 STEP_VEHICLE_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_VIN): str,
         vol.Required(CONF_API_KEY): str,
-        vol.Optional(CONF_SPIN, default=""): str,
     }
 )
 
@@ -51,48 +45,52 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
         # calling an endpoint /api/v1/vehicle/{vin}
         return await client.get_vehicle(vin)
 
+    async def _async_validate(
+        self, vin: str, api_key: str
+    ) -> tuple[Any, str | None]:
+        """Validate credentials, returning (response, None) or (None, error_code)."""
+        try:
+            return await self._test_credentials(vin, api_key), None
+        except TimeoutError:
+            return None, "timeout_connect"
+        except OpenApiAuthenticationError:
+            return None, "invalid_auth"
+        except OpenApiForbiddenError:
+            return None, "access_forbidden"
+        except OpenApiVehicleNotFoundError:
+            return None, "vehicle_not_found"
+        except OpenApiRateLimitError:
+            return None, "rate_limit_exceeded"
+        except OpenApiServerError:
+            return None, "cannot_connect"
+        except OpenApiError:
+            return None, "api_error"
+        except Exception:
+            _LOGGER.exception("Unexpected error during vehicle verification")
+            return None, "unknown"
+
     @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step where user provides VIN, API Key and optional SPIN."""
+        """Handle the initial step where user provides VIN and API key."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             vin = user_input[CONF_VIN].strip().upper()
             api_key = user_input[CONF_API_KEY].strip()
-            spin = user_input.get(CONF_SPIN, "").strip()
 
-            # Basic format validation for VIN and SPIN
+            # Basic format validation for the VIN
             if len(vin) != 17:
                 errors[CONF_VIN] = "invalid_vin_length"
-            elif spin and len(spin) != 4:
-                errors[CONF_SPIN] = "invalid_spin_length"
             else:
                 # Setting a unique ID for the config entry based on the VIN to prevent duplicates.
                 await self.async_set_unique_id(vin)
                 self._abort_if_unique_id_configured()
 
-                try:
-                    # Validate the provided credentials and VIN by calling the OpenAPI client.
-                    vehicle_response = await self._test_credentials(vin, api_key)
-                except TimeoutError:
-                    errors["base"] = "timeout_connect"
-                except OpenApiAuthenticationError:
-                    errors["base"] = "invalid_auth"
-                except OpenApiForbiddenError:
-                    errors["base"] = "access_forbidden"
-                except OpenApiVehicleNotFoundError:
-                    errors["base"] = "vehicle_not_found"
-                except OpenApiRateLimitError:
-                    errors["base"] = "rate_limit_exceeded"
-                except OpenApiServerError:
-                    errors["base"] = "cannot_connect"
-                except OpenApiError:
-                    errors["base"] = "api_error"
-                except Exception:
-                    _LOGGER.exception("Unexpected error during vehicle verification")
-                    errors["base"] = "unknown"
+                vehicle_response, error = await self._async_validate(vin, api_key)
+                if error:
+                    errors["base"] = error
                 else:
                     # Try to get a vehicle model name as an entry title, fallback to VIN if not available.
                     title = f"Škoda {vin}"
@@ -108,7 +106,6 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
                         data={
                             CONF_VIN: vin,
                             CONF_API_KEY: api_key,
-                            CONF_SPIN: spin,
                         },
                     )
 
@@ -118,49 +115,37 @@ class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "portal_url": f"[{MYSKODA_URL}]({MYSKODA_URL})",
-                "qr_code": f"![MyŠkoda App]({QR_URL})",
             },
         )
 
-    @staticmethod
-    @callback
-    @override
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        """Return options flow handler for runtime configuration."""
-        return MySkodaOptionsFlowHandler()
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle reauthentication when the stored API key stops working."""
+        return await self.async_step_reauth_confirm()
 
-
-class MySkodaOptionsFlowHandler(OptionsFlow):
-    """Handle MyŠkoda options (e.g. changing SPIN)."""
-
-    async def async_step_init(
+    async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage integration options."""
+        """Prompt for a new API key and validate it before saving."""
         errors: dict[str, str] = {}
-        current_spin = self.config_entry.data.get(CONF_SPIN, "")
+        reauth_entry = self._get_reauth_entry()
 
         if user_input is not None:
-            spin = user_input.get(CONF_SPIN, "").strip()
+            api_key = user_input[CONF_API_KEY].strip()
+            vin = reauth_entry.data[CONF_VIN]
 
-            if spin and len(spin) != 4:
-                errors[CONF_SPIN] = "invalid_spin_length"
+            _, error = await self._async_validate(vin, api_key)
+            if error:
+                errors["base"] = error
             else:
-                # Update the config entry with the new SPIN value and create an entry to confirm the change.
-                new_data = {**self.config_entry.data, CONF_SPIN: spin}
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=new_data
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data_updates={CONF_API_KEY: api_key},
                 )
-                return self.async_create_entry(title="", data={CONF_SPIN: spin})
-
-        schema = vol.Schema(
-            {
-                vol.Optional(CONF_SPIN, default=current_spin): str,
-            }
-        )
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=schema,
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
             errors=errors,
         )
