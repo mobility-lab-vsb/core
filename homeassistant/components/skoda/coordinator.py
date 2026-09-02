@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 import logging
 from typing import override
 
-from myskoda_openapi.api_layer.exceptions import (
+from skoda_public_api.api_layer.exceptions import (
     OpenApiAuthenticationError,
     OpenApiError,
 )
-from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
+from skoda_public_api.api_layer.open_api_client import OpenAPIClient
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -16,31 +16,28 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .models import MySkodaConfigEntry, SkodaState
+from .models import SkodaConfigEntry, SkodaState
 
 _LOGGER = logging.getLogger(__name__)
 
 UPDATE_INTERVAL = timedelta(minutes=5)
 
 
-class MySkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
+class SkodaUpdateCoordinator(DataUpdateCoordinator[SkodaState]):
     """Central coordinator for fetching and managing vehicle data updates."""
 
-    config_entry: MySkodaConfigEntry
+    config_entry: SkodaConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: MySkodaConfigEntry,
+        entry: SkodaConfigEntry,
         client: OpenAPIClient,
         vin: str,
-        spin: str | None = None,
     ) -> None:
         """Initialize the Škoda coordinator."""
         self.openapi = client
         self.vin = vin
-        self.spin = spin
-        self.aux_heating_duration_minutes: int = 20
         self.last_update_time: datetime | None = None
 
         super().__init__(

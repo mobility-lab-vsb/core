@@ -5,10 +5,16 @@ rules:
     comment: Integration does not register custom actions.
   appropriate-polling: done
   brands: done
+  # NOTE: home-assistant/brands#11080 (icon/logo) was still open at the time
+  # this was written. Assumed merged by the time this PR is submitted -
+  # verify before opening the PR, revert to `todo` if it isn't merged yet.
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
-  dependency-transparency: done
+  dependency-transparency:
+    status: done
+    comment: |
+      The dependency is skoda-public-api on pypi.
   docs-actions:
     status: exempt
     comment: |
@@ -41,8 +47,8 @@ rules:
   entity-unavailable: todo
   integration-owner: todo
   log-when-unavailable: todo
-  parallel-updates: todo
-  reauthentication-flow: todo
+  parallel-updates: done
+  reauthentication-flow: done
   test-coverage: todo
 
   # Gold

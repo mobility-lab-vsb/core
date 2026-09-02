@@ -1,14 +1,14 @@
 {
   "config": {
     "abort": {
-      "already_configured": "This vehicle is already configured."
+      "already_configured": "This vehicle is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     },
     "error": {
       "access_forbidden": "Access to this vehicle is forbidden.",
       "api_error": "Communication error with Škoda API. Check validity of VIN and API-KEY",
       "cannot_connect": "Cannot connect to Škoda servers.",
       "invalid_auth": "Invalid or expired API Key.",
-      "invalid_spin_length": "SPIN has to be 4 characters long",
       "invalid_vin_length": "VIN must be exactly 17 characters long.",
       "rate_limit_exceeded": "Rate limit exceeded or low 12V battery.",
       "timeout_connect": "Connection to the vehicle timed out.",
@@ -16,19 +16,26 @@
       "vehicle_not_found": "No vehicle found with this VIN."
     },
     "step": {
+      "reauth_confirm": {
+        "data": {
+          "api_key": "API-Key"
+        },
+        "data_description": {
+          "api_key": "Your API key from the MyŠkoda app under Profile -> Smart Home."
+        },
+        "description": "Your API key for this vehicle is no longer valid. Enter a new one to reconnect.",
+        "title": "Reauthenticate Škoda Connect"
+      },
       "user": {
         "data": {
           "api_key": "API-Key",
-          "spin": "S-PIN (optional)",
           "vin": "Vehicle VIN (17 characters)"
         },
         "data_description": {
           "api_key": "Your API key from the MyŠkoda app under Profile -> Smart Home.",
-          "spin": "The 4-digit S-PIN, required for auxiliary heating operations.",
           "vin": "The 17-character Vehicle Identification Number (VIN) of your vehicle."
         },
-        "description": "***Škoda Auto a.s.*** *in collaboration with* ***Mobility Lab VŠB TUO***.\n\nTo connect the vehicle, enter the **VIN** and **API key**. *SPIN is required for auxiliary heating operations*.\n\nObtain your API key via the MyŠkoda application in section Profile -> Smart Home. \nScan the QR code or click the link:\n{portal_url}\n\n{qr_code}",
-        "title": "Škoda Connect"
+        "description": "***Škoda Auto a.s.*** *in collaboration with* ***Mobility Lab VŠB TUO***.\n\nTo connect the vehicle, enter the **VIN** and **API key**.\n\nObtain your API key via the MyŠkoda application in section Profile -> Smart Home, or via the web portal:\n{portal_url}"
       }
     }
   },
@@ -49,26 +56,11 @@
       "battery_percentage": {
         "name": "Battery state of charge"
       },
-      "car_model": {
-        "name": "Vehicle model"
-      },
       "charge_type": {
         "name": "Charge type"
       },
       "charging_power": {
         "name": "Charging power"
-      },
-      "charging_profile_1_preffered_time_1": {
-        "name": "Charging profile 1 preferred time"
-      },
-      "charging_profile_1_timer_1": {
-        "name": "Charging profile 1 timer"
-      },
-      "charging_profile_name_one": {
-        "name": "Charging profile 1 name"
-      },
-      "charging_profile_settings_ovrl_one": {
-        "name": "Charging profile 1 settings"
       },
       "charging_state": {
         "name": "Charging state"
@@ -117,23 +109,7 @@
       },
       "total_range": {
         "name": "Total range"
-      },
-      "vin": {
-        "name": "VIN"
       }
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "data": {
-          "spin": "S-PIN (optional)"
-        },
-        "data_description": {
-          "spin": "The 4-digit S-PIN, required for auxiliary heating operations."
-        }
-      }
-    }
-  },
-  "title": "Škoda Connect"
+  }
 }

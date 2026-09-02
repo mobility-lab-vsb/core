@@ -1,95 +1,29 @@
 """Entity base for the Škoda integration."""
 
-from collections.abc import Callable, Coroutine
-from functools import wraps
-import logging
-from typing import Any, TypeVar, override
+from typing import override
 
-from myskoda_openapi.api_layer.exceptions import (
-    OpenApiAuthenticationError,
-    OpenApiError,
-    OpenApiForbiddenError,
-    OpenApiRateLimitError,
-    OpenApiServerError,
-    OpenApiUnsupportedError,
-    OpenApiVehicleNotFoundError,
-)
-from myskoda_openapi.models.active_ventilation import ActiveVentilation
-from myskoda_openapi.models.air_conditioning import AirConditioning
-from myskoda_openapi.models.auxiliary_heating import AuxiliaryHeating
-from myskoda_openapi.models.charging import Charging
-from myskoda_openapi.models.charging_profiles import ChargingProfiles
-from myskoda_openapi.models.driving_range import FuelStatus
-from myskoda_openapi.models.parking_position import ParkingPosition
-from myskoda_openapi.models.vehicle import Odometer, VehicleObject
-from myskoda_openapi.models.vehicle_status import VehicleStatus
+from skoda_public_api.models.active_ventilation import ActiveVentilation
+from skoda_public_api.models.air_conditioning import AirConditioning
+from skoda_public_api.models.auxiliary_heating import AuxiliaryHeating
+from skoda_public_api.models.charging import Charging
+from skoda_public_api.models.driving_range import FuelStatus
+from skoda_public_api.models.parking_position import ParkingPosition
+from skoda_public_api.models.vehicle import Odometer, VehicleObject
+from skoda_public_api.models.vehicle_status import VehicleStatus
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import MySkodaUpdateCoordinator
-
-_LOGGER = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-# Map OpenAPI exceptions to alert codes
-EXCEPTION_ALERT_MAP: dict[type[Exception], str] = {
-    TimeoutError: "alert_api_timeout",
-    OpenApiAuthenticationError: "alert_auth_failed",
-    OpenApiForbiddenError: "alert_forbidden_failed",
-    OpenApiVehicleNotFoundError: "alert_vehicle_not_found",
-    OpenApiUnsupportedError: "alert_unsupported_operation",
-    OpenApiRateLimitError: "alert_rate_limit_or_low_battery",
-    OpenApiServerError: "alert_server_error",
-    OpenApiError: "alert_bad_request",
-}
+from .coordinator import SkodaUpdateCoordinator
 
 
-def skoda_exception_handler(
-    action_description: str = "Operation",
-) -> Callable[..., Callable[..., Coroutine[Any, Any, Any]]]:
-    """Decorator for catching exceptions and sending Alerts."""
-
-    def decorator(
-        func: Callable[..., Coroutine[Any, Any, Any]],
-    ) -> Callable[..., Coroutine[Any, Any, Any]]:
-        @wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            try:
-                return await func(self, *args, **kwargs)
-            except Exception as err:
-                # Reset expected state if the entity has it
-                if hasattr(self, "_expected_mode"):
-                    self._expected_mode = None
-                    self.async_write_ha_state()
-
-                # Send localized alerts
-                alert_key = EXCEPTION_ALERT_MAP.get(type(err), "alert_server_error")
-                if hasattr(self, "alerts") and self.alerts:
-                    await self.alerts.failure(alert_key)
-
-                entity_name = (
-                    getattr(self, "entity_id", None) or self.__class__.__name__
-                )
-                _LOGGER.exception(
-                    "[%s] %s failed",
-                    entity_name,
-                    action_description,
-                )
-
-        return wrapper
-
-    return decorator
-
-
-class SkodaEntity(CoordinatorEntity[MySkodaUpdateCoordinator]):
+class SkodaEntity(CoordinatorEntity[SkodaUpdateCoordinator]):
     """Class for all the entities in the integration."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: MySkodaUpdateCoordinator, vin: str) -> None:
+    def __init__(self, coordinator: SkodaUpdateCoordinator, vin: str) -> None:
         """Initialize the entity with a unique ID based on VIN and entity key."""
         super().__init__(coordinator)
         self.vin = vin  # coordinator.vin
@@ -135,13 +69,6 @@ class SkodaEntity(CoordinatorEntity[MySkodaUpdateCoordinator]):
         """Returns main Odometer from new OpenAPI."""
         if self.coordinator.data and self.coordinator.data.vehicle_response:
             return self.coordinator.data.vehicle_response.vehicle.odometer
-        return None
-
-    @property
-    def open_api_charging_profiles(self) -> ChargingProfiles | None:
-        """Returns main Odometer from new OpenAPI."""
-        if self.coordinator.data and self.coordinator.data.vehicle_response:
-            return self.coordinator.data.vehicle_response.vehicle.charging_profiles
         return None
 
     @property
@@ -203,16 +130,6 @@ class SkodaEntity(CoordinatorEntity[MySkodaUpdateCoordinator]):
         """Universal decider method: Checks if the vehicle has a combustion engine (fuelStatus)."""
         # Utilizes the open_api_driving_range property, which returns FuelStatus
         return self.open_api_driving_range is not None
-
-    @property
-    def spin(self) -> str | None:
-        """Return the stored S-PIN if available."""
-        return getattr(self.coordinator, "spin", None)
-
-    @property
-    def is_spin_available(self) -> bool:
-        """Check if S-PIN is present and valid."""
-        return bool(self.spin)
 
     @property
     @override
