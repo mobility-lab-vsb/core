@@ -5,7 +5,7 @@ import logging
 from typing import Any, override
 
 # Import vlastních výjimek a klienta z nové OpenAPI knihovny
-from myskoda_openapi.api_layer.exceptions import (
+from skoda_public_api.api_layer.exceptions import (
     OpenApiAuthenticationError,
     OpenApiError,
     OpenApiForbiddenError,
@@ -13,7 +13,7 @@ from myskoda_openapi.api_layer.exceptions import (
     OpenApiServerError,
     OpenApiVehicleNotFoundError,
 )
-from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
+from skoda_public_api.api_layer.open_api_client import OpenAPIClient
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -33,8 +33,8 @@ STEP_VEHICLE_DATA_SCHEMA = vol.Schema(
 )
 
 
-class MySkodaConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for MyŠkoda."""
+class SkodaConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Škoda."""
 
     VERSION = 1
 

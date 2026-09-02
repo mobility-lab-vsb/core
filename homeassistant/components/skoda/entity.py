@@ -2,28 +2,28 @@
 
 from typing import override
 
-from myskoda_openapi.models.active_ventilation import ActiveVentilation
-from myskoda_openapi.models.air_conditioning import AirConditioning
-from myskoda_openapi.models.auxiliary_heating import AuxiliaryHeating
-from myskoda_openapi.models.charging import Charging
-from myskoda_openapi.models.driving_range import FuelStatus
-from myskoda_openapi.models.parking_position import ParkingPosition
-from myskoda_openapi.models.vehicle import Odometer, VehicleObject
-from myskoda_openapi.models.vehicle_status import VehicleStatus
+from skoda_public_api.models.active_ventilation import ActiveVentilation
+from skoda_public_api.models.air_conditioning import AirConditioning
+from skoda_public_api.models.auxiliary_heating import AuxiliaryHeating
+from skoda_public_api.models.charging import Charging
+from skoda_public_api.models.driving_range import FuelStatus
+from skoda_public_api.models.parking_position import ParkingPosition
+from skoda_public_api.models.vehicle import Odometer, VehicleObject
+from skoda_public_api.models.vehicle_status import VehicleStatus
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import MySkodaUpdateCoordinator
+from .coordinator import SkodaUpdateCoordinator
 
 
-class SkodaEntity(CoordinatorEntity[MySkodaUpdateCoordinator]):
+class SkodaEntity(CoordinatorEntity[SkodaUpdateCoordinator]):
     """Class for all the entities in the integration."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: MySkodaUpdateCoordinator, vin: str) -> None:
+    def __init__(self, coordinator: SkodaUpdateCoordinator, vin: str) -> None:
         """Initialize the entity with a unique ID based on VIN and entity key."""
         super().__init__(coordinator)
         self.vin = vin  # coordinator.vin

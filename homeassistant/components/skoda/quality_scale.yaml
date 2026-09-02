@@ -14,9 +14,12 @@ rules:
   dependency-transparency:
     status: todo
     comment: |
-      myvsb-developer-api's GitHub repository is currently private.
-      The rule requires the dependency source to be public; must be
-      made public before this can be marked done.
+      The dependency was renamed from myvsb-developer-api to
+      skoda-public-api and its GitHub repository is now public
+      (github.com/mobility-lab-vsb/skoda-public-api), which resolves
+      half of this rule. It is not yet published on PyPI under the
+      new name though (still 404 as of writing) - must be published
+      before this can be marked done.
   docs-actions:
     status: exempt
     comment: |

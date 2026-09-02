@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
-from myskoda_openapi.api_layer.exceptions import OpenApiAuthenticationError
+from skoda_public_api.api_layer.exceptions import OpenApiAuthenticationError
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant

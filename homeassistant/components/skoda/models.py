@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigEntry
 
 if TYPE_CHECKING:
-    from myskoda_openapi.api_layer.open_api_client import OpenAPIClient
-    from myskoda_openapi.models.vehicle import VehicleResponse
+    from skoda_public_api.api_layer.open_api_client import OpenAPIClient
+    from skoda_public_api.models.vehicle import VehicleResponse
 
-    from .coordinator import MySkodaUpdateCoordinator
+    from .coordinator import SkodaUpdateCoordinator
 
 
 @dataclass
@@ -24,12 +24,12 @@ class SkodaState:
 
 
 @dataclass
-class MySkodaData:
+class SkodaData:
     """Runtime data stored in ConfigEntry."""
 
     openapi: OpenAPIClient
-    coordinator: MySkodaUpdateCoordinator
+    coordinator: SkodaUpdateCoordinator
     vin: str
 
 
-type MySkodaConfigEntry = ConfigEntry[MySkodaData]
+type SkodaConfigEntry = ConfigEntry[SkodaData]

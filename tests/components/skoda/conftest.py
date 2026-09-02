@@ -3,17 +3,18 @@
 from collections.abc import Generator
 from unittest.mock import AsyncMock, patch
 
-from myskoda_openapi.models.air_conditioning import AirConditioning
-from myskoda_openapi.models.auxiliary_heating import AuxiliaryHeating
-from myskoda_openapi.models.charging import (
+import pytest
+from skoda_public_api.models.air_conditioning import AirConditioning
+from skoda_public_api.models.auxiliary_heating import AuxiliaryHeating
+from skoda_public_api.models.charging import (
     BatteryStatus,
     Charging,
     ChargingSettings,
     ChargingStatus,
 )
-from myskoda_openapi.models.common import TargetTemperature
-from myskoda_openapi.models.driving_range import EngineRange, FuelStatus
-from myskoda_openapi.models.enums import (
+from skoda_public_api.models.common import TargetTemperature
+from skoda_public_api.models.driving_range import EngineRange, FuelStatus
+from skoda_public_api.models.enums import (
     AirConditioningState,
     AutoUnlockPlugState,
     AuxiliaryHeatingState,
@@ -26,13 +27,12 @@ from myskoda_openapi.models.enums import (
     TemperatureUnit,
     YesNoState,
 )
-from myskoda_openapi.models.vehicle import Odometer, VehicleObject, VehicleResponse
-from myskoda_openapi.models.vehicle_status import (
+from skoda_public_api.models.vehicle import Odometer, VehicleObject, VehicleResponse
+from skoda_public_api.models.vehicle_status import (
     OverallVehicleStatus,
     VehicleStatus,
     VehicleStatusDetail,
 )
-import pytest
 
 from homeassistant.components.skoda.const import CONF_VIN
 from homeassistant.const import CONF_API_KEY

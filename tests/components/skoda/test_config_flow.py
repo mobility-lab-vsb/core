@@ -3,7 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from myskoda_openapi.api_layer.exceptions import (
+import pytest
+from skoda_public_api.api_layer.exceptions import (
     OpenApiAuthenticationError,
     OpenApiError,
     OpenApiForbiddenError,
@@ -11,8 +12,7 @@ from myskoda_openapi.api_layer.exceptions import (
     OpenApiServerError,
     OpenApiVehicleNotFoundError,
 )
-from myskoda_openapi.models.vehicle import VehicleResponse
-import pytest
+from skoda_public_api.models.vehicle import VehicleResponse
 
 from homeassistant import config_entries
 from homeassistant.components.skoda.const import CONF_VIN, DOMAIN

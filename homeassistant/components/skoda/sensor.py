@@ -6,7 +6,11 @@ from enum import StrEnum
 import logging
 from typing import Any, override
 
-from myskoda_openapi.models.enums import AirConditioningState, ChargeType, ChargingState
+from skoda_public_api.models.enums import (
+    AirConditioningState,
+    ChargeType,
+    ChargingState,
+)
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -27,9 +31,9 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .coordinator import MySkodaUpdateCoordinator
+from .coordinator import SkodaUpdateCoordinator
 from .entity import SkodaEntity
-from .models import MySkodaConfigEntry
+from .models import SkodaConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -180,8 +184,8 @@ class CapabilitySelector:
 
     def add_entity(
         self,
-        entity_cls: Callable[[MySkodaUpdateCoordinator], Entity],
-        coordinator: MySkodaUpdateCoordinator,
+        entity_cls: Callable[[SkodaUpdateCoordinator], Entity],
+        coordinator: SkodaUpdateCoordinator,
     ) -> None:
         """Add an entity if the vehicle matches required capability logic."""
         raw_capabilities = getattr(entity_cls, "capabilities", None)
@@ -216,10 +220,10 @@ class CapabilitySelector:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: MySkodaConfigEntry,
+    entry: SkodaConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up MySkoda sensors from ConfigEntry runtime_data."""
+    """Set up Škoda sensors from ConfigEntry runtime_data."""
     coordinator = entry.runtime_data.coordinator
     if coordinator.data and coordinator.data.vehicle_response:
         vehicle_data = coordinator.data.vehicle_response.vehicle
@@ -256,9 +260,9 @@ async def async_setup_entry(
 
 
 class SkodaSensor(SkodaEntity, SensorEntity):
-    """Base class for all MySkoda sensor entities."""
+    """Base class for all Škoda sensor entities."""
 
-    def __init__(self, coordinator: MySkodaUpdateCoordinator) -> None:
+    def __init__(self, coordinator: SkodaUpdateCoordinator) -> None:
         """Initialize the sensor with a coordinator and VIN."""
         vin = coordinator.vin
         super().__init__(coordinator, vin)
