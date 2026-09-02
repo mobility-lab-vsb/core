@@ -12,14 +12,9 @@ rules:
   config-flow-test-coverage: done
   config-flow: done
   dependency-transparency:
-    status: todo
+    status: done
     comment: |
-      The dependency was renamed from myvsb-developer-api to
-      skoda-public-api and its GitHub repository is now public
-      (github.com/mobility-lab-vsb/skoda-public-api), which resolves
-      half of this rule. It is not yet published on PyPI under the
-      new name though (still 404 as of writing) - must be published
-      before this can be marked done.
+      The dependency is skoda-public-api on pypi.
   docs-actions:
     status: exempt
     comment: |

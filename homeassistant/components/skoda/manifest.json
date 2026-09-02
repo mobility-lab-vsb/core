@@ -7,5 +7,5 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "quality_scale": "bronze",
-  "requirements": ["skoda-public-api==1.0.12"]
+  "requirements": ["skoda-public-api==1.2.0"]
 }

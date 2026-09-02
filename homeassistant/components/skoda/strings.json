@@ -35,8 +35,7 @@
           "api_key": "Your API key from the MyŠkoda app under Profile -> Smart Home.",
           "vin": "The 17-character Vehicle Identification Number (VIN) of your vehicle."
         },
-        "description": "***Škoda Auto a.s.*** *in collaboration with* ***Mobility Lab VŠB TUO***.\n\nTo connect the vehicle, enter the **VIN** and **API key**.\n\nObtain your API key via the MyŠkoda application in section Profile -> Smart Home, or via the web portal:\n{portal_url}",
-        "title": "Škoda Connect"
+        "description": "***Škoda Auto a.s.*** *in collaboration with* ***Mobility Lab VŠB TUO***.\n\nTo connect the vehicle, enter the **VIN** and **API key**.\n\nObtain your API key via the MyŠkoda application in section Profile -> Smart Home, or via the web portal:\n{portal_url}"
       }
     }
   },
@@ -112,6 +111,5 @@
         "name": "Total range"
       }
     }
-  },
-  "title": "Škoda Connect"
+  }
 }
