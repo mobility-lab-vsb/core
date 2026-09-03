@@ -4,7 +4,6 @@ from collections.abc import Mapping
 import logging
 from typing import Any, override
 
-# Import vlastních výjimek a klienta z nové OpenAPI knihovny
 from skoda_public_api.api_layer.exceptions import (
     OpenApiAuthenticationError,
     OpenApiError,
@@ -14,6 +13,7 @@ from skoda_public_api.api_layer.exceptions import (
     OpenApiVehicleNotFoundError,
 )
 from skoda_public_api.api_layer.open_api_client import OpenAPIClient
+from skoda_public_api.models.vehicle import VehicleResponse
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -38,14 +38,16 @@ class SkodaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def _test_credentials(self, vin: str, api_key: str) -> Any:
+    async def _test_credentials(self, vin: str, api_key: str) -> VehicleResponse:
         """Validate credentials and VIN by requesting the vehicle status from OpenAPI."""
         session = async_get_clientsession(self.hass)
         client = OpenAPIClient(api_key=api_key, session=session)
         # calling an endpoint /api/v1/vehicle/{vin}
         return await client.get_vehicle(vin)
 
-    async def _async_validate(self, vin: str, api_key: str) -> tuple[Any, str | None]:
+    async def _async_validate(
+        self, vin: str, api_key: str
+    ) -> tuple[VehicleResponse | None, str | None]:
         """Validate credentials, returning (response, None) or (None, error_code)."""
         try:
             return await self._test_credentials(vin, api_key), None
@@ -93,7 +95,7 @@ class SkodaConfigFlow(ConfigFlow, domain=DOMAIN):
                     # Try to get a vehicle model name as an entry title, fallback to VIN if not available.
                     title = f"Škoda {vin}"
                     if (
-                        hasattr(vehicle_response, "vehicle")
+                        vehicle_response
                         and vehicle_response.vehicle
                         and vehicle_response.vehicle.name
                     ):

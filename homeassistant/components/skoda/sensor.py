@@ -1,7 +1,7 @@
 """Support for Škoda sensors."""
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 import logging
 from typing import Any, override
@@ -235,17 +235,13 @@ async def async_setup_entry(
     selector.add_entity(MileAge, coordinator)
     selector.add_entity(LastSynchronization, coordinator)
     selector.add_entity(FuelLevel, coordinator)
-    selector.add_entity(GasLevel, coordinator)
     selector.add_entity(BatteryPercentage, coordinator)
-    selector.add_entity(AdBlueRange, coordinator)
     selector.add_entity(TotalRange, coordinator)
     selector.add_entity(ElectricRange, coordinator)
     selector.add_entity(RemainingACTime, coordinator)
-    selector.add_entity(SupposeTimeOfReachingChargeLimit, coordinator)
     selector.add_entity(ChargingPowerInKw, coordinator)
     selector.add_entity(ChargingStateSensor, coordinator)
     selector.add_entity(RemainingTimeToFullCharge, coordinator)
-    selector.add_entity(SetTargetOfCharge, coordinator)
     selector.add_entity(ChargeTypeSensor, coordinator)
     selector.add_entity(AuxiliaryHeatingMode, coordinator)
     selector.add_entity(AuxHeatingDuration, coordinator)
@@ -299,7 +295,7 @@ class LastSynchronization(SkodaSensor):
 
     entity_description = SensorEntityDescription(
         key="timestamp_last_sync",
-        translation_key="last_sync_data",
+        translation_key="timestamp_last_sync",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:cloud-sync-outline",
@@ -350,39 +346,6 @@ class FuelLevel(SkodaSensor):
         return [Capability.FUEL_STATUS]
 
 
-class GasLevel(SkodaSensor):
-    """Gas level of a hybrid CNG vehicles."""
-
-    entity_description = SensorEntityDescription(
-        key="gas_level",
-        translation_key="gas_level",
-        native_unit_of_measurement=PERCENTAGE,
-        icon="mdi:gas-station",
-    )
-
-    @property
-    @override
-    def native_value(self) -> int | None:
-        driving_range = self.open_api_driving_range
-        if driving_range is not None:
-            # Display primary engine range
-            primary_engine = driving_range.primary_engine_range
-            if primary_engine is not None:
-                return primary_engine.current_fuel_level_in_percent
-
-            # Display secondary engine range
-            secondary_engine = driving_range.secondary_engine_range
-            if secondary_engine is not None:
-                return secondary_engine.current_fuel_level_in_percent
-
-        return None
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CT_CNG, Capability.CT_LPG]
-
-
 class BatteryPercentage(SkodaSensor):
     """Battery percentage level - only for electric and hybrid vehicles."""
 
@@ -410,30 +373,6 @@ class BatteryPercentage(SkodaSensor):
     def capabilities() -> list[Capability]:
         """Return the capabilities required for this entity."""
         return [Capability.CHARGING]
-
-
-class AdBlueRange(SkodaSensor):
-    """Remaining km for the AddBlue of the vehicle - for diesel motors."""
-
-    entity_description = SensorEntityDescription(
-        key="adblue_range",
-        translation_key="adblue_range",
-        native_unit_of_measurement=UnitOfLength.KILOMETERS,
-        icon="mdi:car-coolant-level",
-    )
-
-    @property
-    @override
-    def native_value(self) -> int | None:
-        driving_range = self.open_api_driving_range
-        if driving_range is not None:
-            return driving_range.ad_blue_range
-        return None
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.ADBLUE]
 
 
 class TotalRange(SkodaSensor):
@@ -485,38 +424,6 @@ class ElectricRange(SkodaSensor):
             return charging.status.battery.remaining_cruising_range_in_meters / 1000
 
         return None
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING]
-
-
-class SupposeTimeOfReachingChargeLimit(SkodaSensor):
-    """Time that is supposed to be reached the set charge limit."""
-
-    entity_description = SensorEntityDescription(
-        key="time_of_reaching_charge_limit",
-        translation_key="time_of_reaching_charge_limit",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        icon="mdi:timer-check-outline",
-    )
-
-    @property
-    @override
-    def native_value(self) -> datetime | None:
-        ac = self.open_api_air_conditioning
-        charging = self.open_api_charging
-
-        if not charging or not charging.status or not ac:
-            return None
-
-        remaintime = charging.status.remaining_time_to_fully_charged_in_minutes
-        if remaintime is None or remaintime <= 0:
-            return None
-
-        now = dt_util.utcnow()
-        return now + timedelta(minutes=remaintime)
 
     @staticmethod
     def capabilities() -> list[Capability]:
@@ -597,8 +504,26 @@ class ChargingStateSensor(SkodaSensor):
     entity_description = SensorEntityDescription(
         key="charging_state",
         translation_key="charging_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=[
+            "charging",
+            "connect_cable",
+            "ready_for_charging",
+            "conserving",
+            "discharging",
+            "charging_interrupted",
+        ],
         icon="mdi:battery-charging",
     )
+
+    _STATE_MAP = {
+        ChargingState.CHARGING: "charging",
+        ChargingState.CONNECT_CABLE: "connect_cable",
+        ChargingState.READY_FOR_CHARGING: "ready_for_charging",
+        ChargingState.CONSERVING: "conserving",
+        ChargingState.DISCHARGING: "discharging",
+        ChargingState.CHARGING_INTERRUPTED: "charging_interrupted",
+    }
 
     @property
     @override
@@ -607,22 +532,7 @@ class ChargingStateSensor(SkodaSensor):
         if not charging or not charging.status:
             return None
 
-        state = charging.status.state
-        if state is not None:
-            if state == ChargingState.CHARGING:
-                return "CHARGING"
-            if state == ChargingState.CONNECT_CABLE:
-                return "CONNECT CABLE"
-            if state == ChargingState.READY_FOR_CHARGING:
-                return "READY FOR CHARGING"
-            if state == ChargingState.CONSERVING:
-                return "CONSERVING"
-            if state == ChargingState.DISCHARGING:
-                return "DISCHARGING"
-            if state == ChargingState.CHARGING_INTERRUPTED:
-                return "CHARGING INTERRUPTED"
-
-        return None
+        return self._STATE_MAP.get(charging.status.state)
 
     @staticmethod
     def capabilities() -> list[Capability]:
@@ -659,39 +569,22 @@ class RemainingTimeToFullCharge(SkodaSensor):
         return [Capability.CHARGING]
 
 
-class SetTargetOfCharge(SkodaSensor):
-    """Current set target of battery charge in percent."""
-
-    entity_description = SensorEntityDescription(
-        key="set_target_battery_charge",
-        translation_key="set_target_battery_charge",
-        native_unit_of_measurement=PERCENTAGE,
-        icon="mdi:percent-circle-outline",
-    )
-
-    @property
-    @override
-    def native_value(self) -> int | None:
-        charging = self.open_api_charging
-        if not charging or not charging.settings:
-            return None
-
-        return charging.settings.target_state_of_charge_in_percent
-
-    @staticmethod
-    def capabilities() -> list[Capability]:
-        """Return the capabilities required for this entity."""
-        return [Capability.CHARGING]
-
-
 class ChargeTypeSensor(SkodaSensor):
     """Charge type - AC/DC/OFF."""
 
     entity_description = SensorEntityDescription(
         key="charge_type",
         translation_key="charge_type",
+        device_class=SensorDeviceClass.ENUM,
+        options=["ac", "dc", "off", "not_charging"],
         icon="mdi:connection",
     )
+
+    _CHARGE_TYPE_MAP = {
+        ChargeType.AC: "ac",
+        ChargeType.DC: "dc",
+        ChargeType.OFF: "off",
+    }
 
     @property
     @override
@@ -706,16 +599,9 @@ class ChargeTypeSensor(SkodaSensor):
             return None
 
         if charging.status.state != ChargingState.CHARGING:
-            return "Not charging!"
+            return "not_charging"
 
-        if charging.status.charge_type == ChargeType.AC:
-            return "AC"
-        if charging.status.charge_type == ChargeType.DC:
-            return "DC"
-        if charging.status.charge_type == ChargeType.OFF:
-            return "OFF"
-
-        return None
+        return self._CHARGE_TYPE_MAP.get(charging.status.charge_type)
 
     @staticmethod
     def capabilities() -> list[Capability]:
@@ -810,6 +696,7 @@ class APIKeyExpiration(SkodaSensor):
         translation_key="api_key_expiration",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:api",
     )
 
@@ -831,6 +718,7 @@ class RateLimitRemaining(SkodaSensor):
         key="rate_limit_remaining",
         translation_key="rate_limit_remaining",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:counter",
     )
 
@@ -848,6 +736,7 @@ class RateLimitResetSeconds(SkodaSensor):
         translation_key="rate_limit_reset_seconds",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:timelapse",
     )
 
@@ -866,6 +755,7 @@ class NextUpdateInterval(SkodaSensor):
         translation_key="next_update_interval",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:timer-sync-outline",
     )
 

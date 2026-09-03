@@ -41,9 +41,6 @@
   },
   "entity": {
     "sensor": {
-      "adblue_range": {
-        "name": "AdBlue range"
-      },
       "api_key_expiration": {
         "name": "API key expiration"
       },
@@ -57,22 +54,33 @@
         "name": "Battery state of charge"
       },
       "charge_type": {
-        "name": "Charge type"
+        "name": "Charge type",
+        "state": {
+          "ac": "AC",
+          "dc": "DC",
+          "not_charging": "Not charging",
+          "off": "Off"
+        }
       },
       "charging_power": {
         "name": "Charging power"
       },
       "charging_state": {
-        "name": "Charging state"
+        "name": "Charging state",
+        "state": {
+          "charging": "Charging",
+          "charging_interrupted": "Charging interrupted",
+          "connect_cable": "Connect cable",
+          "conserving": "Conserving",
+          "discharging": "Discharging",
+          "ready_for_charging": "Ready for charging"
+        }
       },
       "electric_range": {
         "name": "Electric range"
       },
       "fuel_level": {
         "name": "Fuel level"
-      },
-      "gas_level": {
-        "name": "Gas level (CNG/LPG)"
       },
       "licence_plate": {
         "name": "Registation plate"
@@ -97,12 +105,6 @@
       },
       "remaining_time_to_full_battery": {
         "name": "Time to full charge"
-      },
-      "set_target_battery_charge": {
-        "name": "Target charge limit"
-      },
-      "time_of_reaching_charge_limit": {
-        "name": "Target charge reached at"
       },
       "timestamp_last_sync": {
         "name": "Last synchronization"
