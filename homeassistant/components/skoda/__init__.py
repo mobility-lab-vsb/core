@@ -20,7 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SkodaConfigEntry) -> boo
 
     # Extract the configuration data from the entry
     vin: str = entry.data[CONF_VIN]
-    api_key: str = entry.data.get(CONF_API_KEY, "")
+    api_key: str = entry.data[CONF_API_KEY]
 
     # 1. Create API instance
     # Initialization of the API client with the provided API key and an aiohttp session.

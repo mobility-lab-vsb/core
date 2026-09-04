@@ -145,10 +145,10 @@ class SkodaEntity(CoordinatorEntity[SkodaUpdateCoordinator]):
                 self.coordinator.data.vehicle_response.vehicle.name
                 or f"Škoda {self.vin}"
             )
-        return {
-            "identifiers": {(DOMAIN, self.vin)},
-            "name": vehicle_name,
-            "manufacturer": "Škoda Auto",
-            "model": vehicle_name,
-            "serial_number": self.vin,
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.vin)},
+            name=vehicle_name,
+            manufacturer="Škoda Auto",
+            model=vehicle_name,
+            serial_number=self.vin,
+        )

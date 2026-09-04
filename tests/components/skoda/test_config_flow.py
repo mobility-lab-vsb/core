@@ -168,6 +168,26 @@ async def test_api_errors(
     assert result["errors"] == {"base": expected_error}
 
 
+async def test_error_recovery(hass: HomeAssistant, mock_setup_entry: AsyncMock) -> None:
+    """Test the flow recovers after a failed attempt and completes on retry."""
+    mock = _patch_get_vehicle(
+        side_effect=[OpenApiAuthenticationError(), VEHICLE_WITH_NAME]
+    )
+
+    result = await _init_flow(hass)
+    result = await _configure_flow(hass, result["flow_id"])
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+
+    result = await _configure_flow(hass, result["flow_id"])
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Škoda Superb"
+    assert mock.await_count == 2
+    assert len(mock_setup_entry.mock_calls) == 1
+
+
 async def test_reauth_success(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
