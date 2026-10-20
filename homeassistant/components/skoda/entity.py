@@ -1,16 +1,38 @@
 """Entity base for the Škoda integration."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from skoda_public_api.models.air_conditioning import AirConditioning
 from skoda_public_api.models.auxiliary_heating import AuxiliaryHeating
 from skoda_public_api.models.charging import Charging
 from skoda_public_api.models.driving_range import FuelStatus
+from skoda_public_api.models.enums import VehicleCapability
 from skoda_public_api.models.vehicle import Odometer, VehicleObject
+from skoda_public_api.models.vehicle_status import VehicleStatus
 
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SkodaUpdateCoordinator
+
+
+@dataclass(frozen=True, kw_only=True)
+class SkodaEntityDescription(EntityDescription):
+    """Describes which vehicle capabilities a Škoda entity requires."""
+
+    required_capabilities: frozenset[VehicleCapability] = frozenset()
+    is_supported_fn: Callable[[set[VehicleCapability]], bool] | None = None
+
+    def is_supported(self, capabilities: set[VehicleCapability]) -> bool:
+        """Return whether the vehicle's capabilities satisfy this entity's requirements."""
+        if not self.required_capabilities <= capabilities:
+            return False
+        if self.is_supported_fn is not None:
+            return self.is_supported_fn(capabilities)
+        return True
 
 
 class SkodaEntity(CoordinatorEntity[SkodaUpdateCoordinator]):
@@ -40,6 +62,11 @@ class SkodaEntity(CoordinatorEntity[SkodaUpdateCoordinator]):
     def open_api_vehicle(self) -> VehicleObject:
         """Returns main VehicleObject from new OpenAPI."""
         return self.coordinator.data.vehicle_response.vehicle
+
+    @property
+    def open_api_vehicle_status(self) -> VehicleStatus | None:
+        """Returns main VehicleStatus from new OpenAPI."""
+        return self.coordinator.data.vehicle_response.vehicle.status
 
     @property
     def open_api_odometer(self) -> Odometer | None:

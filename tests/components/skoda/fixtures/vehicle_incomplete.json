@@ -2,6 +2,20 @@
   "vehicle": {
     "name": "Superb",
     "vin": "TMBJM7NP2M1TMP511",
+    "status": {
+      "overall": {
+        "doorsLocked": "UNKNOWN",
+        "locked": "UNKNOWN",
+        "doors": "UNKNOWN",
+        "windows": "UNKNOWN",
+        "lights": "UNKNOWN"
+      },
+      "detail": {
+        "sunroof": "UNKNOWN",
+        "trunk": "UNKNOWN",
+        "bonnet": "UNKNOWN"
+      }
+    },
     "charging": {
       "isVehicleInSavedLocation": false,
       "status": {

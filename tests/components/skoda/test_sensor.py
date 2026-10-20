@@ -1,6 +1,6 @@
 """Test the Škoda sensor platform."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from freezegun.api import FrozenDateTimeFactory
 import pytest
@@ -15,7 +15,7 @@ from syrupy.assertion import SnapshotAssertion
 
 from homeassistant.components.skoda.const import DOMAIN
 from homeassistant.components.skoda.coordinator import UPDATE_INTERVAL
-from homeassistant.const import STATE_UNKNOWN
+from homeassistant.const import STATE_UNKNOWN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -44,7 +44,8 @@ async def test_sensors(
     """Test the Škoda sensor entities against a snapshot."""
     freezer.move_to("2024-01-10T12:00:00+00:00")
 
-    await setup_integration(hass, mock_config_entry)
+    with patch("homeassistant.components.skoda._PLATFORMS", [Platform.SENSOR]):
+        await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)
 

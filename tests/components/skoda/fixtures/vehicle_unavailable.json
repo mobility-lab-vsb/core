@@ -4,6 +4,10 @@
   },
   "errors": [
     {
+      "type": "VEHICLE_STATUS_UNAVAILABLE",
+      "description": "Vehicle status is temporarily unavailable."
+    },
+    {
       "type": "ODOMETER_UNAVAILABLE",
       "description": "Odometer is temporarily unavailable."
     },

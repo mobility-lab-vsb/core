@@ -35,7 +35,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
 from .coordinator import SkodaConfigEntry, SkodaUpdateCoordinator
-from .entity import SkodaEntity
+from .entity import SkodaEntity, SkodaEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,21 +73,11 @@ _AUXILIARY_HEATING_START_MODE_MAP = {
 
 
 @dataclass(frozen=True, kw_only=True)
-class SkodaSensorEntityDescription(SensorEntityDescription):
+class SkodaSensorEntityDescription(SensorEntityDescription, SkodaEntityDescription):
     """Describes a Škoda sensor entity."""
 
     value_fn: Callable[[SkodaEntity], StateType | datetime]
     unit_fn: Callable[[SkodaEntity], str] | None = None
-    required_capabilities: frozenset[VehicleCapability] = frozenset()
-    is_supported_fn: Callable[[set[VehicleCapability]], bool] | None = None
-
-    def is_supported(self, capabilities: set[VehicleCapability]) -> bool:
-        """Return whether the vehicle's capabilities satisfy this entity's requirements."""
-        if not self.required_capabilities <= capabilities:
-            return False
-        if self.is_supported_fn is not None:
-            return self.is_supported_fn(capabilities)
-        return True
 
 
 def _mileage_value(entity: SkodaEntity) -> int | None:
